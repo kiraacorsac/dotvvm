@@ -10,7 +10,6 @@ interface DotvvmPostbackScriptFunction {
 }
 
 class DotVVM {
-
     private postBackCounter = 0;
     private resourceSigns: { [name: string]: boolean } = {}
     private isViewModelUpdating: boolean = true;
@@ -205,13 +204,12 @@ class DotVVM {
                     // add updated controls
                     this.restoreUpdatedControls(resultObject, updatedControls, true);
                     this.isViewModelUpdating = false;
-
                 } else if (resultObject.action === "redirect") {
                     // redirect
                     this.handleRedirect(resultObject, viewModelName);
                     return;
-                } 
-            
+                }
+
                 // trigger afterPostback event
                 var afterPostBackArgs = new DotvvmAfterPostBackEventArgs(sender, viewModel, viewModelName, validationTargetPath, resultObject);
                 this.events.afterPostback.trigger(afterPostBackArgs);
@@ -349,14 +347,14 @@ class DotVVM {
 
         // add virtual directory prefix
         var fullUrl = this.addLeadingSlash(this.concatUrl(this.viewModels[viewModelName].virtualDirectory || "", url));
-        
+
         // find SPA placeholder
         var spaPlaceHolder = this.getSpaPlaceHolder();
         if (!spaPlaceHolder) {
             document.location.href = fullUrl;
             return;
         }
-        
+
         // send the request
         var spaPlaceHolderUniqueId = spaPlaceHolder.attributes["data-dot-spacontentplaceholder"].value;
         this.getJSON(fullUrl, "GET", spaPlaceHolderUniqueId, result => {
@@ -392,8 +390,8 @@ class DotVVM {
                 } else if (resultObject.action === "redirect") {
                     this.handleRedirect(resultObject, viewModelName);
                     return;
-                } 
-            
+                }
+
                 // trigger spaNavigated event
                 var spaNavigatedArgs = new DotvvmSpaNavigatedEventArgs(viewModel, viewModelName, resultObject);
                 this.events.spaNavigated.trigger(spaNavigatedArgs);
@@ -597,8 +595,7 @@ class DotVVM {
     }
 }
 
-
-// DotvvmEvent is used because CustomEvent is not browser compatible and does not support 
+// DotvvmEvent is used because CustomEvent is not browser compatible and does not support
 // calling missed events for handler that subscribed too late.
 class DotvvmEvent<T extends DotvvmEventArgs> {
     private handlers = [];
@@ -682,9 +679,7 @@ interface SerializationOptions {
 }
 
 class DotvvmSerialization {
-
     public deserialize(viewModel: any, target?: any, deserializeAll: boolean = false) {
-
         if (typeof (viewModel) == "undefined" || viewModel == null) {
             return viewModel;
         }
@@ -739,7 +734,7 @@ class DotvvmSerialization {
 
                 // deserialize value
                 var deserialized = this.deserialize(value, result[prop], deserializeAll);
-                
+
                 // handle date
                 if (options && options.isDate && deserialized) {
                     deserialized = new Date(deserialized);
@@ -775,7 +770,6 @@ class DotvvmSerialization {
 
         return target;
     }
-
 
     public serialize(viewModel: any, opt: SerializationOptions = {}): any {
         opt = ko.utils.extend({}, opt);
@@ -913,13 +907,15 @@ class DotvvmSerialization {
         var offsetHour = this.pad((Math.abs(date.getTimezoneOffset() / 60) | 0).toString(), 2);
         var offsetMinute = this.pad(Math.abs(date.getTimezoneOffset() % 60).toString(), 2);
 
+        if (y === '0000' && sign === '-') {
+            return "0001-01-01T00:00:00.000+00:00";
+        }
+
         return y + "-" + m + "-" + d + "T" + h + ":" + mi + ":" + s + "." + ms + sign + offsetHour + ":" + offsetMinute;
     }
 }
 
-
 var dotvvm = new DotVVM();
-
 
 // add knockout binding handler for update progress control
 ko.bindingHandlers["dotvvmUpdateProgressVisible"] = {
