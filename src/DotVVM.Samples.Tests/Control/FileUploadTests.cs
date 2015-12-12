@@ -18,7 +18,7 @@ namespace DotVVM.Samples.Tests.Control
     {
 
         [TestMethod]
-        [Timeout(120000)]
+        [Timeout(300000)]
         public void Control_FileUpload()
         {
             RunInAllBrowsers(browser =>
@@ -34,7 +34,8 @@ namespace DotVVM.Samples.Tests.Control
                 File.WriteAllText(tempFile, string.Join(",", Enumerable.Range(1, 100000)));
 
                 // write the full path to the dialog
-                browser.FileUploadDialogSelect(browser.First(".dot-upload-button a"),tempFile);
+                browser.FileUploadDialogSelect(browser.First(".dot-upload-button a"), tempFile);
+                browser.Wait(5000);
 
                 // wait for the file to be uploaded
                 while (browser.First(".dot-upload-files").GetText() != "1 files")
