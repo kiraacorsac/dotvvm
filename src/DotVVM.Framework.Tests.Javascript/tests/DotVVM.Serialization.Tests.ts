@@ -219,6 +219,40 @@ describe("DotVVM.Serialization - deserialize", () => {
     });
 });
 
+describe("Dotvvm.Deserialization - value type validation", () => {
+    var supportedTypes = ["int64", "int32", "int16", "int8", "uint64", "uint32", "uint16", "uint8", "decimal", "double", "single"]
+
+    it("null is invalid", () => {
+        for (var type in supportedTypes) {
+            expect(dotvvm.serialization.validateType(null, type)).toBe(false);
+        }
+    })
+
+    it("undefined is invalid", () => {
+        for (var type in supportedTypes) {
+            expect(dotvvm.serialization.validateType(undefined, type)).toBe(false);
+        }
+    })
+
+    it("null is valid for nullable", () => {
+        for (var type in supportedTypes) {
+            expect(dotvvm.serialization.validateType(null, type + "?")).toBe(true);
+        }
+    })
+
+    it("undefined is valid for nullable", () => {
+        for (var type in supportedTypes) {
+            expect(dotvvm.serialization.validateType(undefined, type + "?")).toBe(true);
+        }
+    })
+
+    it ("string is invalid", () => {
+        for (var type in supportedTypes) {
+            expect(dotvvm.serialization.validateType("string123", type)).toBe(false);
+        }
+    })
+})
+
 
 describe("DotVVM.Serialization - serialize", () => {
 
@@ -310,5 +344,12 @@ describe("DotVVM.Serialization - serialize", () => {
 
         expect(obj.a).toBe("bbb");
         expect(obj["a$options"].doNotPost).toBeTruthy();
+    });
+    it("Serialize - ko.observable with undefined", () => {
+        var obj = dotvvm.serialization.serialize({
+            a: ko.observable(undefined)
+          }, { serializeAll: true });
+
+        expect(obj.a).toBe(undefined);
     });
 });

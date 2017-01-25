@@ -16,6 +16,8 @@ namespace DotVVM.Framework.Tests.ViewModel
     public class JsonDiffTests
     {
 
+        private JsonSerializer serializer = new JsonSerializer { TypeNameHandling = TypeNameHandling.Auto };
+
         [TestMethod]
         public void JsonDiff_SimpleTest()
         {
@@ -32,7 +34,7 @@ namespace DotVVM.Framework.Tests.ViewModel
             var config = ApplyPatches(
                 CreateDiff(c => c.Resources.Register("resource-1", new InlineScriptResource { Code = "alert()" })),
                 CreateDiff(c => c.Resources.Register("resource-2", new InlineScriptResource { Code = "console.log()" })),
-                CreateDiff(c => c.Resources.Register("resource-3", new ScriptResource { Url = "http://i.dont.know/which.js", Dependencies = new[] { "dotvvm" } }))
+                CreateDiff(c => c.Resources.Register("resource-3", new ScriptResource(new RemoteResourceLocation("http://i.dont.know/which.js")) { Dependencies = new[] { "dotvvm" } }))
                 );
             Assert.IsInstanceOfType(config.Resources.FindResource("resource-1"), typeof(InlineScriptResource));
             Assert.IsInstanceOfType(config.Resources.FindResource("resource-2"), typeof(InlineScriptResource));
@@ -58,20 +60,20 @@ namespace DotVVM.Framework.Tests.ViewModel
         private JObject CreateDiff(Action<DotvvmConfiguration> fn)
         {
             var config = DotvvmConfiguration.CreateDefault();
-            var json0 = JObject.FromObject(config);
+            var json0 = JObject.FromObject(config, serializer);
             fn(config);
-            var json1 = JObject.FromObject(config);
+            var json1 = JObject.FromObject(config, serializer);
             return JsonUtils.Diff(json0, json1);
         }
 
         private DotvvmConfiguration ApplyPatches(DotvvmConfiguration init, params JObject[] patches)
         {
-            var json = JObject.FromObject(init);
+            var json = JObject.FromObject(init, serializer);
             foreach (var p in patches)
             {
                 JsonUtils.Patch(json, p);
             }
-            return json.ToObject<DotvvmConfiguration>();
+            return json.ToObject<DotvvmConfiguration>(serializer);
         }
 
         private DotvvmConfiguration ApplyPatches(params JObject[] patches) => ApplyPatches(DotvvmConfiguration.CreateDefault(), patches);

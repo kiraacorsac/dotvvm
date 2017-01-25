@@ -9,10 +9,12 @@ using System.Linq.Expressions;
 using System.Reflection;
 using DotVVM.Framework.Compilation.ControlTree;
 using DotVVM.Framework.Compilation.ControlTree.Resolved;
-using Microsoft.Extensions.PlatformAbstractions;
-using Microsoft.Extensions.DependencyModel;
 using System.Security.Cryptography;
 using System.Text;
+
+#if DotNetCore
+using Microsoft.Extensions.DependencyModel;
+#endif
 
 namespace DotVVM.Framework.Utils
 {
@@ -284,12 +286,10 @@ namespace DotVVM.Framework.Utils
             return Nullable.GetUnderlyingType(type) != null;
         }
 
-        public static T GetCustomAttribute<T>(this ICustomAttributeProvider attributeProvider, bool inherit = true)
-            where T : Attribute => 
+        public static T GetCustomAttribute<T>(this ICustomAttributeProvider attributeProvider, bool inherit = true) => 
             (T)attributeProvider.GetCustomAttributes(typeof(T), inherit).FirstOrDefault();
 
-        public static IEnumerable<T> GetCustomAttributes<T>(this ICustomAttributeProvider attributeProvider, bool inherit = true)
-            where T : Attribute =>
+        public static IEnumerable<T> GetCustomAttributes<T>(this ICustomAttributeProvider attributeProvider, bool inherit = true) =>
             attributeProvider.GetCustomAttributes(typeof(T), inherit).Cast<T>();
 
         public static string GetTypeHash(this Type type)

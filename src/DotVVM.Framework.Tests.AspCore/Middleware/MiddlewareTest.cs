@@ -4,84 +4,93 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using DotVVM.Framework.Hosting;
-using Microsoft.AspNetCore.Http.Internal;
 using Moq;
-using Xunit;
-using Xunit.Abstractions;
+using System.Threading;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace DotVVM.Framework.Tests.AspCore.Middleware
 {
+    [TestClass]
     public class MiddlewareTest
     {
-        private readonly ITestOutputHelper _output;
-
         public const string FinalFunction = "final";
         public const string AfterFunction = "after";
         public const string BeforeFunction = "before";
 
         private IDotvvmRequestContext _requestContext;
         private Stream _stream;
-
-        public MiddlewareTest(ITestOutputHelper output)
-        {
-            _output = output;
-            Initialize();
-        }
-
+        
+        [TestInitialize]
         public void Initialize()
         {
             var mockResponse = new Mock<IHttpResponse>();
             _stream = new MemoryStream();
-            mockResponse.Setup(p => p.Write(It.IsAny<string>())).Callback((string text) =>
-            {
-                var writer = new StreamWriter(_stream) {AutoFlush = true};
-                writer.Write(text);
-            });
 
+            mockResponse
+                .Setup(p => p.WriteAsync(It.IsAny<string>()))
+                .Returns<string>(
+                async (text) =>
+                {
+                    var writer = new StreamWriter(_stream) { AutoFlush = true };
+                    await writer.WriteAsync(text);
+                });
 
             var mockContext = new Mock<IHttpContext>();
             mockContext.Setup(m => m.Response).Returns(mockResponse.Object);
 
-            _requestContext = new DotvvmRequestContext() {HttpContext = mockContext.Object};
+            _requestContext = new DotvvmRequestContext() { HttpContext = mockContext.Object };
         }
 
 
-        [Fact]
-        public async void TestFinalFuncion()
+        [TestMethod]
+        public async Task TestFinalFuncion()
         {
-            _requestContext.HttpContext.Response.Write(FinalFunction);
-            Assert.Equal(FinalFunction, ReadResponseBody());
+            await _requestContext.HttpContext.Response.WriteAsync(FinalFunction);
+            Assert.AreEqual(FinalFunction, ReadResponseBody());
         }
 
-        [Fact]
-        public void TestBeforeMiddleware()
+        [TestMethod]
+        public async Task TestBeforeMiddleware()
         {
-            new BeforeMiddleware().Handle(_requestContext, 
-                async context => { context.HttpContext.Response.Write(FinalFunction); })
-                .Wait();
 
-            Assert.Equal(BeforeFunction + FinalFunction, ReadResponseBody());
+            var middlewere = new BeforeMiddleware();
+            await middlewere.Handle(_requestContext, async context =>
+            {
+                await context.HttpContext.Response.WriteAsync(FinalFunction);
+            });
+
+            Assert.AreEqual(BeforeFunction + FinalFunction, ReadResponseBody());
         }
 
-        [Fact]
-        public void TestAfterMiddleware()
+        [TestMethod]
+        public async Task TestAfterMiddleware()
         {
-            new AfterMiddleware().Handle(_requestContext, 
-                async context => { context.HttpContext.Response.Write(FinalFunction); })
-                .Wait();
+            var middleware = new AfterMiddleware();
+            await middleware.Handle(_requestContext, async context =>
+            {
+                await context.HttpContext.Response.WriteAsync(FinalFunction);
+            });
 
-            Assert.Equal(FinalFunction + AfterFunction, ReadResponseBody());
+            Assert.AreEqual(FinalFunction + AfterFunction, ReadResponseBody());
         }
 
-        [Fact]
-        public async void TestAllMiddleware()
+        [TestMethod]
+        public async Task TestAllMiddleware()
         {
-            new BeforeMiddleware().Handle(_requestContext, 
-                c => new AfterMiddleware().Handle(c, 
-                async context => { context.HttpContext.Response.Write(FinalFunction); }))
-                .Wait();
+            var before = new BeforeMiddleware();
+            var after = new AfterMiddleware();
 
-            Assert.Equal(BeforeFunction + FinalFunction + AfterFunction, ReadResponseBody());
+            await before.Handle(_requestContext,
+                async c =>
+                {
+                    await after.Handle(c,
+                        async context =>
+                        {
+                            await context.HttpContext.Response.WriteAsync(FinalFunction);
+                        });
+                });
+
+            Assert.AreEqual(BeforeFunction + FinalFunction + AfterFunction, ReadResponseBody());
         }
 
 

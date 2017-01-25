@@ -111,9 +111,16 @@ namespace DotVVM.Framework.Compilation.Binding
         // This conversion produces the null value (§4.1.10) of the given nullable type.
         public static Expression NullLiteralConverion(Expression src, Type destType)
         {
-            if (src.NodeType == ExpressionType.Constant && src.Type == typeof(object) && ((ConstantExpression)src).Value == null && destType.IsNullable())
+            if (src.NodeType == ExpressionType.Constant && src.Type == typeof(object) && ((ConstantExpression)src).Value == null)
             {
-                return Expression.Constant(Activator.CreateInstance(destType), destType);
+                if (destType.IsNullable())
+                {
+                    return Expression.Constant(Activator.CreateInstance(destType), destType);
+                }
+                if (!destType.GetTypeInfo().IsValueType)
+                {
+                    return Expression.Constant(null, destType);
+                }
             }
             return null;
         }
@@ -141,7 +148,7 @@ namespace DotVVM.Framework.Compilation.Binding
                   NullLiteralConverion(src, destType) ??
                   BoxingConversion(src, destType) ??
                   ReferenceConversion(src, destType);
-            if (allowToString && destType == typeof(string) && (result == null || src.Type == typeof(object)))
+            if (allowToString && destType == typeof(string) && result == null)
             {
                 result = ToStringConversion(src);
             }
@@ -170,6 +177,11 @@ namespace DotVVM.Framework.Compilation.Binding
         [SuppressMessage("Microsoft.Maintainability", "CA1502:AvoidExcessiveComplexity")]
         public static Expression ImplicitConstantConversion(Expression src, Type destType)
         {
+            if (src.NodeType == ExpressionType.Conditional && src is ConditionalExpression conditional &&
+                ImplicitConversion(conditional.IfTrue, destType) is Expression ifTrue &&
+                ImplicitConversion(conditional.IfFalse, destType) is Expression ifFalse)
+                return Expression.Condition(conditional.Test, ifTrue, ifFalse);
+
             if (src.NodeType != ExpressionType.Constant)
                 return null;
 

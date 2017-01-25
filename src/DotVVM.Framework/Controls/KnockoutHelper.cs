@@ -79,17 +79,14 @@ namespace DotVVM.Framework.Controls
         public static string GenerateClientPostBackScript(string propertyName, ICommandBinding expression, DotvvmControl control, PostbackScriptOptions options)
         {
             object uniqueControlId = null;
-            if (expression is ControlCommandBindingExpression)
-            {
-                var target = (DotvvmControl)control.GetClosestControlBindingTarget();
-                uniqueControlId = target.GetDotvvmUniqueId();
-            }
+            var target = (DotvvmControl)control.GetClosestControlBindingTarget();
+            uniqueControlId = target?.GetDotvvmUniqueId();
 
             var arguments = new List<string>()
             {
                 "'root'",
                 options.ElementAccessor,
-                "[" + String.Join(", ", GetContextPath(control).Reverse().Select(p => '"' + p + '"')) + "]",
+                "[" + string.Join(", ", GetContextPath(control).Reverse().Select(p => '"' + p + '"')) + "]",
                 (uniqueControlId is IValueBinding ? "{ expr: " + JsonConvert.ToString(((IValueBinding)uniqueControlId).GetKnockoutBindingExpression(), '\'', StringEscapeHandling.Default) + "}" : "'" + (string) uniqueControlId + "'"),
                 options.UseWindowSetTimeout ? "true" : "false",
                 JsonConvert.SerializeObject(GetValidationTargetExpression(control)),
@@ -98,12 +95,28 @@ namespace DotVVM.Framework.Controls
             };
 
             // return the script
-            var condition = options.IsOnChange ? "if (!dotvvm.isViewModelUpdating) " : null;
             var returnStatement = options.ReturnValue != null ? $";return {options.ReturnValue.ToString().ToLower()};" : "";
 
+            if (expression is StaticCommandBindingExpression)
+            {
+                if (arguments.Last() != "null" && arguments.Last() != "[]")
+                    throw new NotSupportedException($"PostBack.Handlers are not supported for staticCommand binding");
+                // static command only requires the first argument
+                arguments.RemoveRange(1, arguments.Count - 1);
+            }
+
             // call the function returned from binding js with runtime arguments
-            var postBackCall = $"{expression.GetCommandJavascript()}({String.Join(", ", arguments)})";
-            return condition + postBackCall + returnStatement;
+            var postBackCall = $"{expression.GetCommandJavascript()}({string.Join(", ", arguments)})";
+
+            if (options.UseWindowSetTimeout && expression is StaticCommandBindingExpression)
+                postBackCall = "setTimeout(function(){" + postBackCall + "}.bind(this),0)";
+
+            if (options.IsOnChange)
+            {
+                postBackCall = $"if(!dotvvm.isViewModelUpdating){{{postBackCall}}}";
+            }
+
+            return postBackCall + returnStatement;
         }
 
         /// <summary>

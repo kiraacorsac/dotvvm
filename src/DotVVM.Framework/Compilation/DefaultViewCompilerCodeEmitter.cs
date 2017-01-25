@@ -277,12 +277,19 @@ namespace DotVVM.Framework.Compilation
             if (type.GetTypeInfo().IsEnum)
             {
                 UseType(type);
-                return
-                    SyntaxFactory.MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        ParseTypeName(type),
-                        SyntaxFactory.IdentifierName(value.ToString())
-                    );
+                var flags =
+                    value.ToString().Split(',').Select(v =>
+                        SyntaxFactory.MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            ParseTypeName(type),
+                            SyntaxFactory.IdentifierName(v.ToString())
+                        )
+                   ).ToArray();
+                ExpressionSyntax expr = flags[0];
+                foreach (var i in flags.Skip(1)) {
+                    expr = SyntaxFactory.BinaryExpression(SyntaxKind.BitwiseOrExpression, expr, i);
+                }
+                return expr;
             }
             if (type.IsArray || typeof(IEnumerable).IsAssignableFrom(type))
             {
@@ -351,7 +358,7 @@ namespace DotVVM.Framework.Compilation
                                 .WithInitializer(SyntaxFactory.EqualsValueClause(
                                     SyntaxFactory.InvocationExpression(
                                         SyntaxFactory.ParseName(gprop.PropertyGroup.DeclaringType.FullName + "." + gprop.PropertyGroup.DescriptorField.Name
-                                            + "." + nameof(PropertyGroupDescriptor.GetDotvvmProperty)),
+                                            + "." + nameof(DotvvmPropertyGroup .GetDotvvmProperty)),
                                         SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(
                                             SyntaxFactory.Argument(this.EmitStringLiteral(gprop.GroupMemberName))
                                         ))
@@ -382,7 +389,7 @@ namespace DotVVM.Framework.Compilation
                 var gProperty = property as GroupedDotvvmProperty;
                 if (gProperty != null && gProperty.PropertyGroup.PropertyGroupMode == PropertyGroupMode.ValueCollection)
                 {
-                    EmitAddToDictionary(controlName, property.CastTo<GroupedDotvvmProperty>().PropertyGroup.PropertyName, gProperty.GroupMemberName, value);
+                    EmitAddToDictionary(controlName, property.CastTo<GroupedDotvvmProperty>().PropertyGroup.Name, gProperty.GroupMemberName, value);
                 }
                 else
                 {
@@ -467,7 +474,7 @@ namespace DotVVM.Framework.Compilation
                             SyntaxFactory.MemberAccessExpression(
                                 SyntaxKind.SimpleMemberAccessExpression,
                                 SyntaxFactory.IdentifierName(controlName),
-                                SyntaxFactory.IdentifierName("Attributes")
+                                SyntaxFactory.IdentifierName(propertyName)
                             ),
                             SyntaxFactory.BracketedArgumentList(
                                 SyntaxFactory.SeparatedList(

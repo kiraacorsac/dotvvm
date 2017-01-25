@@ -232,8 +232,8 @@ var DotvvmGlobalize = (function () {
     DotvvmGlobalize.prototype.parseNumber = function (value) {
         return dotvvm_Globalize.parseFloat(value, 10, dotvvm.culture);
     };
-    DotvvmGlobalize.prototype.parseDate = function (value, format) {
-        return dotvvm_Globalize.parseDate(value, format, dotvvm.culture);
+    DotvvmGlobalize.prototype.parseDate = function (value, format, previousValue) {
+        return dotvvm_Globalize.parseDate(value, format, dotvvm.culture, previousValue);
     };
     return DotvvmGlobalize;
 })();
@@ -460,7 +460,7 @@ var DotvvmSerialization = (function () {
         if (opt.pathOnly && opt.path && opt.path.length === 0)
             opt.pathOnly = false;
         if (typeof (viewModel) === "undefined" || viewModel == null) {
-            return viewModel;
+            return null;
         }
         if (typeof (viewModel) === "string" || typeof (viewModel) === "number" || typeof (viewModel) === "boolean") {
             return viewModel;
@@ -547,7 +547,7 @@ var DotvvmSerialization = (function () {
         if (nullable) {
             type = type.substr(0, type.length - 1);
         }
-        if (nullable && (typeof (value) === "undefined" || value == null)) {
+        if (nullable && (value == null || value == "")) {
             return true;
         }
         var intmatch = /(u?)int(\d*)/.exec(type);
@@ -566,7 +566,8 @@ var DotvvmSerialization = (function () {
             return int >= minValue && int <= maxValue && int === parseFloat(value);
         }
         if (type === "number" || type === "single" || type === "double" || type === "decimal") {
-            return !isNaN(value) || value === NaN;
+            // should check if the value is numeric or number in a string
+            return +value === value || (!isNaN(+value) && typeof value == "string");
         }
         return true;
     };
@@ -1633,7 +1634,7 @@ var DotVVM = (function () {
         xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         preprocessRequest(xhr);
         xhr.onreadystatechange = function () {
-            if (xhr.readyState != 4)
+            if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
             if (xhr.status < 400) {
                 success(xhr);
@@ -1650,7 +1651,7 @@ var DotVVM = (function () {
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.setRequestHeader("X-DotVVM-SpaContentPlaceHolder", spaPlaceHolderUniqueId);
         xhr.onreadystatechange = function () {
-            if (xhr.readyState != 4)
+            if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
             if (xhr.status < 400) {
                 success(xhr);
@@ -1860,6 +1861,39 @@ var DotVVM = (function () {
                 });
             }
         };
+        ko.bindingHandlers['dotvvm-table-columnvisible'] = {
+            init: function (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
+                var lastDisplay = "";
+                var currentVisible = true;
+                function changeVisibility(table, columnIndex, visible) {
+                    if (currentVisible == visible)
+                        return;
+                    currentVisible = visible;
+                    for (var i = 0; i < table.rows.length; i++) {
+                        var row = table.rows.item(i);
+                        var style = row.cells[columnIndex].style;
+                        if (visible) {
+                            style.display = lastDisplay;
+                        }
+                        else {
+                            lastDisplay = style.display;
+                            style.display = "none";
+                        }
+                    }
+                }
+                if (!(element instanceof HTMLTableCellElement))
+                    return;
+                // find parent table
+                var table = element;
+                while (!(table instanceof HTMLTableElement))
+                    table = table.parentElement;
+                var colIndex = [].slice.call(table.rows.item(0).cells).indexOf(element);
+                element['dotvvmChangeVisibility'] = changeVisibility.bind(null, table, colIndex);
+            },
+            update: function (element, valueAccessor) {
+                element.dotvvmChangeVisibility(ko.unwrap(valueAccessor()));
+            }
+        };
         ko.bindingHandlers['dotvvm-textbox-text'] = {
             init: function (element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
                 var obs = valueAccessor();
@@ -1895,7 +1929,11 @@ var DotVVM = (function () {
                     var result, isEmpty, newValue;
                     if (elmMetadata.dataType === "datetime") {
                         // parse date
-                        result = dotvvm.globalize.parseDate(element.value, elmMetadata.format);
+                        var currentValue = obs();
+                        if (currentValue != null) {
+                            currentValue = dotvvm.globalize.parseDotvvmDate(currentValue);
+                        }
+                        result = dotvvm.globalize.parseDate(element.value, elmMetadata.format, currentValue);
                         isEmpty = result === null;
                         newValue = isEmpty ? null : dotvvm.serialization.serializeDate(result, false);
                     }

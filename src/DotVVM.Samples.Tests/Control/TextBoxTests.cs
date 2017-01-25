@@ -26,6 +26,7 @@ namespace DotVVM.Samples.Tests.Control
                 browser.First("#TextArea2").CheckTagName("textarea");
             });
         }
+                
         [TestMethod]
         public void Control_TextBox_StringFormat()
         {
@@ -90,5 +91,7 @@ namespace DotVVM.Samples.Tests.Control
                 checkForLanguage("cs-CZ");
             });
         }
+
+
     }
 }

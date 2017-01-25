@@ -13,6 +13,7 @@ using DotVVM.Framework.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
+using DotVVM.Framework.ResourceManagement;
 
 namespace DotVVM.Framework.ViewModel.Serialization
 {
@@ -81,9 +82,12 @@ namespace DotVVM.Framework.ViewModel.Serialization
             // persist encrypted values
             if (viewModelConverter.EncryptedValues.Count > 0)
                 writer.Token["$encryptedValues"] = viewModelProtector.Protect(viewModelConverter.EncryptedValues.ToString(Formatting.None), context);
-
+            
             // serialize validation rules
-            var validationRules = SerializeValidationRules(viewModelConverter);
+            bool useClientSideValidation = context.Configuration.ClientSideValidation;
+            var validationRules = useClientSideValidation ?
+                SerializeValidationRules(viewModelConverter) :
+                null;
 
             // create result object
             var result = new JObject();
@@ -105,7 +109,7 @@ namespace DotVVM.Framework.ViewModel.Serialization
                 result["renderedResources"] = JArray.FromObject(context.ResourceManager.RequiredResources);
             }
             // TODO: do not send on postbacks
-            if (validationRules.Count > 0) result["validationRules"] = validationRules;
+            if (validationRules?.Count > 0) result["validationRules"] = validationRules;
 
             context.ViewModelJson = result;
         }
@@ -131,9 +135,7 @@ namespace DotVVM.Framework.ViewModel.Serialization
                 {
                     using (var str = new StringWriter())
                     {
-                        var w = new HtmlWriter(str, context);
-                        resource.Resource.Render(w, context);
-                        resourceObj[resource.Name] = JValue.CreateString(str.ToString());
+                        resourceObj[resource.Name] = JValue.CreateString(resource.GetRenderedTextCached(context));
                     }
                 }
             }
@@ -149,6 +151,7 @@ namespace DotVVM.Framework.ViewModel.Serialization
             foreach (var map in viewModelConverter.UsedSerializationMaps)
             {
                 var rule = new JObject();
+
                 foreach (var property in map.Properties.Where(p => p.ClientValidationRules.Any()))
                 {
                     rule[property.Name] = JToken.FromObject(property.ClientValidationRules);

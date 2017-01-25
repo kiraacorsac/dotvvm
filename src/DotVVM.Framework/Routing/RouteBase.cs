@@ -118,7 +118,7 @@ namespace DotVVM.Framework.Routing
         /// <summary>
         /// Builds the URL.
         /// </summary>
-        public string BuildUrl(object routeValues)
+        public string BuildUrl(object routeValues = null)
         {
             var values = new Dictionary<string, object>(DefaultValues, StringComparer.OrdinalIgnoreCase);
             AddOrUpdateParameterCollection(values, routeValues);
@@ -132,7 +132,9 @@ namespace DotVVM.Framework.Routing
         public string BuildUrl(IDictionary<string, object> routeValues)
         {
             if (routeValues == null)
-                throw new ArgumentNullException(nameof(routeValues));
+            {
+                routeValues = new Dictionary<string, object>();
+            }
 
             var values = new Dictionary<string, object>(DefaultValues, StringComparer.OrdinalIgnoreCase);
             AddOrUpdateParameterCollection(values, routeValues);
@@ -145,10 +147,6 @@ namespace DotVVM.Framework.Routing
         /// </summary>
         /// <remarks>The default values are already included in the <paramref name="values"/> collection.</remarks>
         protected abstract string BuildUrlCore(Dictionary<string, object> values);
-
-
-
-
 
         /// <summary>
         /// Adds or updates the parameter collection with the specified values from the anonymous object.
@@ -186,7 +184,7 @@ namespace DotVVM.Framework.Routing
         /// <summary>
         /// Processes the request.
         /// </summary>
-        public abstract Task ProcessRequest(IDotvvmRequestContext context);
+        public abstract IDotvvmPresenter GetPresenter();
 
     }
 }

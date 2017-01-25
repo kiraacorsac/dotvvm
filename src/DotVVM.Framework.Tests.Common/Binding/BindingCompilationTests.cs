@@ -324,6 +324,14 @@ namespace DotVVM.Framework.Tests.Binding
         }
 
         [TestMethod]
+        public void BindingCompiler_NullConversion()
+        {
+            var testViewModel = new TestViewModel { StringProp = "ahoj" };
+            ExecuteBinding("StringProp = null", testViewModel);
+            Assert.AreEqual(null, testViewModel.StringProp);
+        }
+
+        [TestMethod]
         public void BindingCompiler_Parents()
         {
             var result = ExecuteBinding("_this.StringProp + _parent.StringProp + StringProp + _parent0.StringProp + _parent1.StringProp + _parent2.StringProp + _parent3.StringProp + _parent4.StringProp", new[] { new TestViewModel { StringProp = "1" },
@@ -332,6 +340,13 @@ namespace DotVVM.Framework.Tests.Binding
                 new TestViewModel { StringProp = "4" },
                 new TestViewModel { StringProp = "5" }});
             Assert.AreEqual("54554321", result);
+        }
+
+        [TestMethod]
+        public void BindingCompiler_ImplicitConstantConversionInsideConditional()
+        {
+            var result = ExecuteBinding("true ? 'Utc' : 'Local'", new object[] { }, null, null, typeof(DateTimeKind));
+            Assert.AreEqual(DateTimeKind.Utc, result);
         }
     }
     class TestViewModel

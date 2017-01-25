@@ -33,6 +33,11 @@ namespace DotVVM.Framework.ViewModel.Serialization
             Properties = properties.ToList();
         }
 
+        public void ResetFunctions()
+        {
+            readerFactory = null;
+            writerFactory = null;
+        }
 
         private Action<JObject, JsonSerializer, object, EncryptedValuesReader> readerFactory;
         /// <summary>
@@ -89,7 +94,7 @@ namespace DotVVM.Framework.ViewModel.Serialization
             block.Add(Expression.Assign(value, Expression.Convert(valueParam, Type)));
 
             // go through all properties that should be read
-            foreach (var property in Properties.Where(p => p.TransferToServer))
+            foreach (var property in Properties.Where(p => p.TransferToServer && p.PropertyInfo.SetMethod != null))
             {
                 if (property.ViewModelProtection == ProtectMode.EncryptData || property.ViewModelProtection == ProtectMode.SignData)
                 {
@@ -176,10 +181,12 @@ namespace DotVVM.Framework.ViewModel.Serialization
             else if (existingValue != null && property.Populate)
             {
                 if (jtoken.Type == JTokenType.Null)
+                {
                     return null;
+                }
                 else if (jtoken.Type == JTokenType.Object)
                 {
-                    serializer.Converters.OfType<ViewModelJsonConverter>().First().Populate((JObject)jtoken, serializer, existingValue);
+                    serializer.Converters.OfType<ViewModelJsonConverter>().First().Populate((JObject) jtoken, serializer, existingValue);
                     return existingValue;
                 }
                 else
@@ -190,7 +197,14 @@ namespace DotVVM.Framework.ViewModel.Serialization
             }
             else
             {
-                return serializer.Deserialize(jtoken.CreateReader(), property.Type);
+                if (property.Type.GetTypeInfo().IsValueType && jtoken.Type == JTokenType.Null)
+                {
+                    return Activator.CreateInstance(property.Type);
+                }
+                else
+                {
+                    return serializer.Deserialize(jtoken.CreateReader(), property.Type);
+                }
             }
         }
 
@@ -230,7 +244,7 @@ namespace DotVVM.Framework.ViewModel.Serialization
             {
                 var endPropertyLabel = Expression.Label("end_property_" + property.Name);
                 var options = new Dictionary<string, object>();
-                if (property.TransferToClient)
+                if (property.TransferToClient && property.PropertyInfo.GetMethod != null)
                 {
                     if (property.TransferFirstRequest != property.TransferAfterPostback)
                     {

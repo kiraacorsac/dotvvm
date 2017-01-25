@@ -1,6 +1,9 @@
-﻿using System;
+﻿using DotVVM.Framework.Routing;
+using DotVVM.Framework.Runtime.Filters;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace DotVVM.Framework.Hosting.Middlewares
@@ -20,8 +23,8 @@ namespace DotVVM.Framework.Hosting.Middlewares
         /// <returns>
         /// <code>true</code>, if the URL contains valid Googlebot hashbang escaped fragment; otherwise <code>false</code>.
         /// </returns>
-        /// <seealso cref="https://developers.google.com/webmasters/ajax-crawling/docs/getting-started"/>
-        private bool TryParseGooglebotHashbangEscapedFragment(string queryString, out string url)
+        /// <see href="https://developers.google.com/webmasters/ajax-crawling/docs/getting-started"/>
+        private static bool TryParseGooglebotHashbangEscapedFragment(string queryString, out string url)
         {
             if (queryString?.StartsWith(GooglebotHashbangEscapedFragment, StringComparison.Ordinal) == true)
             {
@@ -33,10 +36,8 @@ namespace DotVVM.Framework.Hosting.Middlewares
             return false;
         }
 
-
-        public async Task<bool> Handle(IDotvvmRequestContext context)
+        public static RouteBase FindMatchingRoute(IEnumerable<RouteBase> routes, IDotvvmRequestContext context, out IDictionary<string, object> parameters)
         {
-            // attempt to translate Googlebot hashbang espaced fragment URL to a plain URL string.
             string url;
             if (!TryParseGooglebotHashbangEscapedFragment(context.HttpContext.Request.QueryString, out url))
             {
@@ -52,8 +53,19 @@ namespace DotVVM.Framework.Hosting.Middlewares
 
 
             // find the route
-            IDictionary<string, object> parameters = null;
-            var route = context.Configuration.RouteTable.FirstOrDefault(r => r.IsMatch(url, out parameters));
+            foreach (var r in routes)
+            {
+                if (r.IsMatch(url, out parameters)) return r;
+            }
+            parameters = null;
+            return null;
+        }
+
+
+        public async Task<bool> Handle(IDotvvmRequestContext context)
+        {
+            IDictionary<string, object> parameters;
+            var route = FindMatchingRoute(context.Configuration.RouteTable, context, out parameters);
 
             //check if route exists
             if (route == null) return false;
@@ -61,13 +73,25 @@ namespace DotVVM.Framework.Hosting.Middlewares
             context.Route = route;
             context.Parameters = parameters;
 
+            var presenter = context.Presenter = route.GetPresenter();
+            var filters = ActionFilterHelper.GetActionFilters<IPageActionFilter>(presenter.GetType().GetTypeInfo());
+            filters.AddRange(context.Configuration.Runtime.GlobalFilters.OfType<IPageActionFilter>());
             try
             {
-                await route.ProcessRequest(context);
+                foreach (var f in filters) await f.OnPageLoadingAsync(context);
+                await presenter.ProcessRequest(context);
+                foreach (var f in filters) await f.OnPageLoadedAsync(context);
             }
-            catch (DotvvmInterruptRequestExecutionException)
+            catch (DotvvmInterruptRequestExecutionException) { } // the response has already been generated, do nothing
+            catch (DotvvmHttpException) { throw; }
+            catch (Exception exception)
             {
-                // the response has already been generated, do nothing
+                foreach (var f in filters)
+                {
+                    await f.OnPageExceptionAsync(context, exception);
+                    if (context.IsPageExceptionHandled) context.InterruptRequest();
+                }
+                throw;
             }
             return true;
         }
